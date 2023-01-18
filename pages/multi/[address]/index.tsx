@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { pubkeyToAddress, Pubkey, MultisigThresholdPubkey } from "@cosmjs/amino";
+import { MultisigThresholdPubkey, SinglePubkey } from "@cosmjs/amino";
 import { Account, StargateClient } from "@cosmjs/stargate";
 import { assert } from "@cosmjs/utils";
 import { Coin } from "cosmjs-types/cosmos/base/v1beta1/coin";
@@ -14,20 +14,18 @@ import MultisigMembers from "../../../components/dataViews/MultisigMembers";
 import Page from "../../../components/layout/Page";
 import StackableContainer from "../../../components/layout/StackableContainer";
 import TransactionForm from "../../../components/forms/TransactionForm";
+import DelegationForm from "../../../components/forms/DelegationForm";
 
-function participantPubkeysFromMultisig(multisigPubkey: Pubkey) {
-  return multisigPubkey.value.pubkeys;
-}
-
-function participantAddressesFromMultisig(multisigPubkey: Pubkey, addressPrefix: string) {
-  return participantPubkeysFromMultisig(multisigPubkey).map((p: Pubkey) =>
-    pubkeyToAddress(p, addressPrefix),
-  );
+function participantPubkeysFromMultisig(
+  multisig: MultisigThresholdPubkey,
+): readonly SinglePubkey[] {
+  return multisig.value.pubkeys;
 }
 
 const multipage = () => {
   const { state } = useAppContext();
-  const [showTxForm, setShowTxForm] = useState(false);
+  const [showSendTxForm, setShowSendTxForm] = useState(false);
+  const [showDelegateTxForm, setShowDelegateTxForm] = useState(false);
   const [holdings, setHoldings] = useState<Coin | null>(null);
   const [multisigAddress, setMultisigAddress] = useState("");
   const [accountOnChain, setAccountOnChain] = useState<Account | null>(null);
@@ -78,7 +76,8 @@ const multipage = () => {
         </StackableContainer>
         {pubkey && (
           <MultisigMembers
-            members={participantAddressesFromMultisig(pubkey, state.chain.addressPrefix)}
+            members={participantPubkeysFromMultisig(pubkey)}
+            addressPrefix={state.chain.addressPrefix}
             threshold={pubkey.value.threshold}
           />
         )}
@@ -97,15 +96,25 @@ const multipage = () => {
             </div>
           </StackableContainer>
         )}
-        {showTxForm ? (
+        {showSendTxForm && (
           <TransactionForm
             address={multisigAddress}
             accountOnChain={accountOnChain}
             closeForm={() => {
-              setShowTxForm(false);
+              setShowSendTxForm(false);
             }}
           />
-        ) : (
+        )}
+        {showDelegateTxForm && (
+          <DelegationForm
+            address={multisigAddress}
+            accountOnChain={accountOnChain}
+            closeForm={() => {
+              setShowDelegateTxForm(false);
+            }}
+          />
+        )}
+        {!showSendTxForm && !showDelegateTxForm && (
           <div className="interfaces">
             <div className="col-1">
               <MultisigHoldings holdings={holdings} />
@@ -120,7 +129,13 @@ const multipage = () => {
                 <Button
                   label="Create Transaction"
                   onClick={() => {
-                    setShowTxForm(true);
+                    setShowSendTxForm(true);
+                  }}
+                />
+                <Button
+                  label="Create Delegation"
+                  onClick={() => {
+                    setShowDelegateTxForm(true);
                   }}
                 />
               </StackableContainer>
@@ -133,10 +148,12 @@ const multipage = () => {
           display: flex;
           justify-content: space-between;
           margin-top: 50px;
+          flex-direction: column;
         }
         .col-1 {
           flex: 1;
-          padding-right: 50px;
+          padding-right: 0;
+          margin-bottom: 50px;
         }
         .col-2 {
           flex: 1;
@@ -147,6 +164,7 @@ const multipage = () => {
         }
         p {
           margin-top: 15px;
+          max-width: 100%;
         }
         .multisig-error p {
           max-width: 550px;
